@@ -85,4 +85,13 @@ module Client
     conn.exec("SELECT column_name FROM information_schema.columns
       WHERE table_name='#{table.to_s}'").values.flatten
   end
+
+  def self.between(type, lower, upper)
+    conn.exec("SELECT t.name, t.surname, t.activity_id, t.price
+      FROM trainers AS t, activities AS a
+      WHERE t.activity_id = a.id
+      AND a.type = '#{type}'
+      AND t.price BETWEEN #{lower} AND #{upper}
+      ORDER BY t.price ASC").collect { |r| r }
+  end
 end

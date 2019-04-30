@@ -28,10 +28,14 @@ class TableCommand < Clamp::Command
           puts "Unknown table"
           return
         end
-        print_table(name)
+        data = Client.all(name)
+        return if data.length.zero?
+        print_table(name, data)
       else
         tables.each do |table|
-          print_table(table)
+          data = Client.all(table)
+          next if data.length.zero?
+          print_table(table, data)
         end
       end
     end
@@ -110,6 +114,29 @@ class TableCommand < Clamp::Command
   end
 end
 
+class SearchCommand < Clamp::Command
+
+  subcommand "between", "Price between values, value in enum" do
+
+    def execute
+      print "TYPE: ".colorize(:yellow)
+      type = STDIN.gets.chomp
+      print "LOWER PRICE: ".colorize(:yellow)
+      lower = STDIN.gets.chomp
+      print "UPPER PRICE: ".colorize(:yellow)
+      upper = STDIN.gets.chomp
+
+      print_table("RESULT", Client.between(type, lower, upper))
+    end
+  end
+
+  subcommand "fts", "Whole phrase, word not included" do
+
+    def execute
+    end
+  end
+end
+
 def read_column_values(table, topic)
   values = {}
   puts
@@ -123,8 +150,7 @@ def read_column_values(table, topic)
   values.reject { |k, v| v .to_s.empty? }
 end
 
-def print_table(name)
-  data = Client.all(name)
+def print_table(name, data)
   return if data.length == 0
 
   puts "Table #{name.upcase.colorize(color: :green)}"
@@ -147,6 +173,7 @@ end
 class Main < Clamp::Command
   subcommand 'seed', 'Drop schema and seed random values', SeedCommand
   subcommand 'table', 'Manipulate table data', TableCommand
+  subcommand 'search', 'Search table data', SearchCommand
 end
 
 Main.run
