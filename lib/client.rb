@@ -56,10 +56,33 @@ module Client
       VALUES (#{values.map { |v| "'#{v.to_s}'" }.join(", ")})"
   end
 
+  def self.where(params)
+    return if params.length.zero?
+
+    "WHERE #{params.map { |k, v| "#{k} = '#{v}'" }.join(", ")}"
+  end
+
+  def self.update(table, s, w)
+    return if s.length.zero?
+
+    conn.exec "UPDATE #{table}
+      SET #{s.map { |k, v| "#{k} = '#{v}'" }.join(", ")}
+      #{where(w)}"
+  end
+
+  def self.delete(table, w)
+    conn.exec "DELETE FROM #{table} #{where(w)}"
+  end
+
   def self.tables
-    Client.conn.exec("SELECT table_name
+    conn.exec("SELECT table_name
       FROM information_schema.tables
       WHERE table_type='BASE TABLE'
-      AND table_schema='public';").collect { |n| n["table_name"] }
+      AND table_schema='public';").values.flatten
+  end
+
+  def self.columns(table)
+    conn.exec("SELECT column_name FROM information_schema.columns
+      WHERE table_name='#{table.to_s}'").values.flatten
   end
 end
