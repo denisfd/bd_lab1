@@ -133,6 +133,12 @@ class SearchCommand < Clamp::Command
   subcommand "fts", "Whole phrase, word not included" do
 
     def execute
+      print "PHRASE: ".colorize(:yellow)
+      phrase = STDIN.gets.chomp
+      print "EXCLUDE WORD: ".colorize(:yellow)
+      exclude = STDIN.gets.chomp
+
+      print_table("RESULT", Client.fts(phrase, exclude), 255)
     end
   end
 end
@@ -150,22 +156,22 @@ def read_column_values(table, topic)
   values.reject { |k, v| v .to_s.empty? }
 end
 
-def print_table(name, data)
+def print_table(name, data, max = 30)
   return if data.length == 0
 
   puts "Table #{name.upcase.colorize(color: :green)}"
   print_row(data[0].keys)
   puts "-----".colorize(color: :yellow)
   data.each.with_index do |row, i|
-    print_row(row.values, i)
+    print_row(row.values, i, max)
   end
   puts "-----\n".colorize(color: :yellow)
 end
 
-def print_row(row, i = 0)
+def print_row(row, i = 0, max = 30)
   puts row.map { |str|
-    s = " #{str.to_s[0...30]}"
-    s = (s.length >= 31) ? s.gsub(/\s\w+\s*$/, '...') : s
+    s = " #{str.to_s[0...max]}"
+    s = (s.length >= max + 1) ? s.gsub(/\s\w+\s*$/, '...') : s
     s.ljust(13).colorize(color: :white, background: (i % 2 == 0) ? :light_black : :black)
   }.join("|".colorize(color: :yellow))
 end

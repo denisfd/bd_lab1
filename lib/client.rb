@@ -94,4 +94,21 @@ module Client
       AND t.price BETWEEN #{lower} AND #{upper}
       ORDER BY t.price ASC").collect { |r| r }
   end
+
+  def self.fts(phrase, exclude)
+    conn.exec("CREATE OR REPLACE FUNCTION make_tsvector(description TEXT)
+        RETURNS tsvector AS $$
+      BEGIN
+        RETURN (setweight(to_tsvector('english', description),'A'));
+      END
+      $$ LANGUAGE 'plpgsql' IMMUTABLE;
+
+      CREATE INDEX IF NOT EXISTS idx_fts_activities ON activities
+        USING gin(make_tsvector(description));
+
+      SELECT id, ts_headline(description, q) AS description FROM activities,
+      to_tsquery('#{phrase.split.join(" <-> ")} & !#{exclude.split[0]}') AS q
+        WHERE to_tsvector(description) @@ q;")
+      .collect { |r| r }
+  end
 end

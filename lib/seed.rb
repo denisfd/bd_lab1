@@ -51,11 +51,11 @@ module Seed
   def self.activities
     puts ".. Seeding Activities".colorize(:light_green)
     [
-      { id: "running", type: "cardio", description: "Running is a greate exercise for your health. Helps to keep fit." },
+      { id: "running", type: "cardio", description: "Running is a greate exercise for summer. Helps to keep in fit." },
       { id: "skiing", type: "cardio", description: "Skiing is great activity for winter." },
       { id: "calisthenics", type: "bodyweight", description: "Build strength with no additional equipment." },
       { id: "heavylifting", type: "freeweight", description: "Become a Hulk, but no so green." },
-      { id: "fitness", type: "bodyweight", description: "Keep in fit withinterestin exercises." },
+      { id: "fitness", type: "bodyweight", description: "Keep in fit with interesting exercises." },
       { id: "swimming", type: "bodyweight", description: "Keep in fit and develop your strength." },
     ].each do |act|
       print "->".colorize(:yellow),
