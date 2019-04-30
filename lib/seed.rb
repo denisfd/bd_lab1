@@ -1,7 +1,7 @@
 require 'client'
 require 'fabric'
 
-class Seed
+module Seed
   def self.seed
     Client.prepare
 

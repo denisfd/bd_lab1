@@ -1,7 +1,7 @@
 require 'pg'
 require 'colorize'
 
-class Client
+module Client
   def self.conn
     @conn ||= PG.connect(
       dbname: 'lab1',
@@ -54,5 +54,12 @@ class Client
     Client.conn.exec "INSERT INTO #{table.to_s}
       (#{columns.map { |c| c.to_s }.join(", ")})
       VALUES (#{values.map { |v| "'#{v.to_s}'" }.join(", ")})"
+  end
+
+  def self.tables
+    Client.conn.exec("SELECT table_name
+      FROM information_schema.tables
+      WHERE table_type='BASE TABLE'
+      AND table_schema='public';").collect { |n| n["table_name"] }
   end
 end

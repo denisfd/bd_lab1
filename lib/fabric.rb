@@ -1,4 +1,4 @@
-class Fabric
+module Fabric
   def self.name
     [
       "Liam",
