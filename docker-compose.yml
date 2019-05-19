@@ -2,7 +2,7 @@ version: '3'
 
 services:
     pg96:
-        image: postgres:9.6
+        image: postgres:11
         volumes:
             - pg96data:/var/lib/postgresql/data
         ports:

@@ -51,7 +51,7 @@ class TableCommand < Clamp::Command
 
       tables = Client.tables
       print "INSERT INTO: ".colorize(:yellow)
-      choice = STDIN.gets.chomp
+      choice = STDIN.gets.chomp.to_sym
       unless tables.include? choice
         puts "Unknown table"
         return
@@ -78,7 +78,7 @@ class TableCommand < Clamp::Command
 
       tables = Client.tables
       print "UPDATE: ".colorize(:yellow)
-      choice = STDIN.gets.chomp
+      choice = STDIN.gets.chomp.to_sym
       unless tables.include? choice
         puts "Unknown table"
         return
@@ -143,6 +143,20 @@ class SearchCommand < Clamp::Command
   end
 end
 
+class ProcCommand < Clamp::Command
+  def execute
+    print "ID: ".colorize(:yellow)
+    id = STDIN.gets.chomp
+
+
+    binding.pry
+    Client.conn << "CALL cheaperTrainer(#{id});"
+
+    print_table("RESULT", Client.all(clients))
+  end
+end
+
+
 def read_column_values(table, topic)
   values = {}
   puts
@@ -159,7 +173,7 @@ end
 def print_table(name, data, max = 30)
   return if data.length == 0
 
-  puts "Table #{name.upcase.colorize(color: :green)}"
+  puts "Table #{name.to_s.upcase.colorize(color: :green)}"
   print_row(data[0].keys)
   puts "-----".colorize(color: :yellow)
   data.each.with_index do |row, i|
@@ -180,6 +194,7 @@ class Main < Clamp::Command
   subcommand 'seed', 'Drop schema and seed random values', SeedCommand
   subcommand 'table', 'Manipulate table data', TableCommand
   subcommand 'search', 'Search table data', SearchCommand
+  subcommand 'proc', 'Use proc to find cheaper trainer for client', ProcCommand
 end
 
 Main.run

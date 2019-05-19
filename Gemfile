@@ -8,3 +8,5 @@ gem "clamp"
 gem "pg"
 gem "colorize"
 gem "pry"
+
+gem "sequel"

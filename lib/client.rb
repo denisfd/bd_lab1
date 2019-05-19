@@ -1,102 +1,83 @@
-require 'pg'
+require 'sequel'
 require 'colorize'
 
 module Client
   def self.conn
-    @conn ||= PG.connect(
-      dbname: 'lab1',
-      user: 'postgres',
-      password: 's3cr3t',
-      host: '0.0.0.0',
-      port: '5432',
-    )
+    @conn ||= Sequel.connect('postgres://postgres:s3cr3t@0.0.0.0:5432/lab1')
   end
 
   def self.prepare
-    Client.colorized(:light_blue) do |c|
+    conn.tap do |c|
       puts "-> DROPPING TABLES".colorize(:red)
 
-      c.exec "DROP TABLE IF EXISTS activities"
-      c.exec "DROP TYPE IF EXISTS intensity"
-      c.exec "CREATE TYPE intensity
-        AS ENUM ('cardio', 'bodyweight', 'freeweight')"
-      c.exec "DROP TABLE IF EXISTS trainers"
-      c.exec "DROP TABLE IF EXISTS clients"
+      c.drop_table?(:activities, :trainers, :clients, cascade: true)
 
-      puts "-> CREATING TABLES".colorize(:green)
-      c.exec "CREATE TABLE activities
-        (id VARCHAR(30) PRIMARY KEY, type intensity, description TEXT)"
-      c.exec "CREATE TABLE trainers
-        (id SERIAL PRIMARY KEY, name VARCHAR(20), surname VARCHAR(20), activity_id VARCHAR(30), price INTEGER)"
-      c.exec "CREATE TABLE clients
-      (id SERIAL PRIMARY KEY, name VARCHAR(20), surname VARCHAR(20), trainer_id INTEGER, bio TEXT)"
-      puts "<- TABLES CREATED\n".colorize(:green)
+      c.create_table :activities do
+        String :id, primary_key: true
+        String :type
+        String :description, text: true
+      end
+
+      c.create_table :trainers do
+        primary_key :id
+        String :name
+        String :surname
+        foreign_key :activity_id, :activities, type: 'text'
+        Integer :price
+      end
+
+      c.create_table :clients do
+        primary_key :id
+        String :name
+        String :surname
+        foreign_key :trainer_id, :trainers
+        String :bio, text: true
+      end
     end
-  end
 
-  def self.colorized(color)
-    old = conn.set_notice_processor { |m| print m.colorize(color) }
-
-    yield conn
-
-    conn.set_notice_processor &old
+    trigger
+    procedure
   end
 
   def self.all(table)
-    res = conn.exec("SELECT * FROM #{table.to_s}")
-
-    res.collect { |row| row.inject({}) { |h, (k, v)| h[k.to_sym] = v; h } }
+    conn[table].all
   end
 
   def self.insert(table, params)
-    columns = params.keys
-    values = columns.collect { |c| params[c] }
-    Client.conn.exec "INSERT INTO #{table.to_s}
-      (#{columns.map { |c| c.to_s }.join(", ")})
-      VALUES (#{values.map { |v| "'#{v.to_s}'" }.join(", ")})"
-  end
-
-  def self.where(params)
-    return if params.length.zero?
-
-    "WHERE #{params.map { |k, v| "#{k} = '#{v}'" }.join(", ")}"
+    conn[table].insert(params)
   end
 
   def self.update(table, s, w)
     return if s.length.zero?
 
-    conn.exec "UPDATE #{table}
-      SET #{s.map { |k, v| "#{k} = '#{v}'" }.join(", ")}
-      #{where(w)}"
+    conn[table].where(w).update(s)
   end
 
   def self.delete(table, w)
-    conn.exec "DELETE FROM #{table} #{where(w)}"
+    conn[table].where(w).delete
   end
 
   def self.tables
-    conn.exec("SELECT table_name
-      FROM information_schema.tables
-      WHERE table_type='BASE TABLE'
-      AND table_schema='public';").values.flatten
+    conn.tables
   end
 
   def self.columns(table)
-    conn.exec("SELECT column_name FROM information_schema.columns
-      WHERE table_name='#{table.to_s}'").values.flatten
+    conn[table].columns
   end
 
   def self.between(type, lower, upper)
-    conn.exec("SELECT t.name, t.surname, t.activity_id, t.price
+    query = "SELECT t.name, t.surname, t.activity_id, t.price
       FROM trainers AS t, activities AS a
       WHERE t.activity_id = a.id
       AND a.type = '#{type}'
       AND t.price BETWEEN #{lower} AND #{upper}
-      ORDER BY t.price ASC").collect { |r| r }
+      ORDER BY t.price ASC"
+
+    conn[query].all
   end
 
   def self.fts(phrase, exclude)
-    conn.exec("CREATE OR REPLACE FUNCTION make_tsvector(description TEXT)
+    query =  "CREATE OR REPLACE FUNCTION make_tsvector(description TEXT)
         RETURNS tsvector AS $$
       BEGIN
         RETURN (setweight(to_tsvector('english', description),'A'));
@@ -108,7 +89,42 @@ module Client
 
       SELECT id, ts_headline(description, q) AS description FROM activities,
       to_tsquery('#{phrase.split.join(" <-> ")} & !#{exclude.split[0]}') AS q
-        WHERE to_tsvector(description) @@ q;")
-      .collect { |r| r }
+        WHERE to_tsvector(description) @@ q;"
+
+    conn[query].all
+  end
+
+  def self.trigger
+    conn << "CREATE OR REPLACE FUNCTION price_positive()
+      RETURNS trigger AS
+      $BODY$
+        BEGIN
+          IF NEW.price <= 0 THEN
+            RETURN OLD;
+          END IF;
+          RETURN NEW;
+        END;
+      $BODY$
+      LANGUAGE plpgsql VOLATILE;"
+
+    conn << "CREATE TRIGGER validate_price
+      BEFORE UPDATE
+      ON trainers
+      FOR EACH ROW
+      EXECUTE PROCEDURE price_positive();"
+  end
+
+  def self.procedure
+    conn << "CREATE OR REPLACE PROCEDURE cheaperTrainer(INT)
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        UPDATE clients
+        SET trainer_id = (SELECT id FROM trainers ORDER BY price ASC LIMIT 1)
+        WHERE id = $1;
+
+        COMMIT;
+    END;
+    $$;"
   end
 end
